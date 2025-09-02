@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: finance_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - finance_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build: .
+    container_name: finance_api
+    ports:
+      - "8000:80"
+    environment:
+      - POSTGRES_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DATABASE_RETRY_ATTEMPTS=10
+      - DATABASE_RETRY_INTERVAL=5
+    volumes:
+      - ./app:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - finance_network
+    command:
+      uvicorn main:app --host 0.0.0.0 --port 80 --reload
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: finance_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - finance_network
+
+volumes:
+  postgres_data:
+
+networks:
+  finance_network:
