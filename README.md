@@ -1,1 +1,1 @@
-# FirstFastApiProject
+# FastApiProject
